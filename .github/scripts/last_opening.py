@@ -10,7 +10,6 @@
 (время, текст) на снимке ленты равны прежним, заслон краснеет, если цитату
 в ответе считать открытием. Ход 206 узла Prenot@mi.
 """
-import html
 import json
 import re
 import sys
@@ -21,17 +20,6 @@ from pathlib import Path
 KANAL = "italy_belgrade_slots"
 METKA = "ОТКРЫЛАСЬ ЗАПИСЬ"
 FAIL = Path(__file__).resolve().parents[2] / "last.json"
-
-
-def _soobshcheniya_regulyarki(stranica: str):
-    for kusok in stranica.split('class="tgme_widget_message_wrap')[1:]:
-        # js-message_text — само сообщение; js-message_reply_text — цитата в ответе, её не считать
-        tekst = re.search(r'class="tgme_widget_message_text js-message_text"[^>]*>(.*?)</div>', kusok, re.S)
-        vremya = re.search(r'<time[^>]*datetime="([^"]+)"', kusok)
-        if not (tekst and vremya):
-            continue
-        chisty = html.unescape(re.sub(r"<[^>]+>", " ", tekst.group(1)))
-        yield vremya.group(1), re.sub(r"\s+", " ", chisty).strip()
 
 
 class _Lenta(HTMLParser):
