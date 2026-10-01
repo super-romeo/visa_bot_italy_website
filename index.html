@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Слоты Prenot@mi — Италия, Белград: бот сообщает, когда появляется запись</title>
+<meta name="description" content="Свободные слоты на визу Италии в консульстве в Белграде появляются редко и разбираются за минуты. Бот проверяет портал Prenot@mi и пишет в Telegram-канал, как только запись открывается. Бесплатно.">
+<link rel="canonical" href="https://sloty.veridok.ru/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Слоты Prenot@mi — Италия, Белград">
+<meta property="og:description" content="Бот проверяет портал и сообщает в Telegram, как только открывается запись на визу Италии в Белграде.">
+<meta property="og:url" content="https://sloty.veridok.ru/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#0f1115;--fg:#e8eaed;--dim:#9aa0a6;--acc:#4f9cf9;--line:#242833;--warn:#f5a623}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:0 20px}
+header{padding:28px 0 8px}
+.logo{font-weight:700;letter-spacing:.2px}
+.logo span{color:var(--acc)}
+h1{font-size:30px;line-height:1.25;margin:26px 0 14px;font-weight:700}
+h2{font-size:21px;margin:38px 0 12px;font-weight:700}
+h3{font-size:17px;margin:22px 0 6px;font-weight:600}
+p{margin:0 0 14px}
+.sub{color:var(--dim);font-size:18px;margin-bottom:26px}
+.counter{border:1px solid var(--line);border-radius:14px;padding:22px;margin:26px 0;text-align:center;background:#151922}
+.counter .num{font-size:52px;font-weight:700;line-height:1;color:var(--warn)}
+.counter .lbl{color:var(--dim);font-size:15px;margin-top:8px}
+.counter .since{color:var(--dim);font-size:13px;margin-top:10px}
+.cta{display:block;text-align:center;background:var(--acc);color:#0b0d11;text-decoration:none;font-weight:700;font-size:18px;padding:16px 20px;border-radius:12px;margin:22px 0 8px}
+.cta:hover{filter:brightness(1.08)}
+.cta-note{color:var(--dim);font-size:14px;text-align:center;margin-bottom:30px}
+ul{margin:0 0 14px;padding-left:22px}
+li{margin-bottom:8px}
+.card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:12px;background:#141821}
+.card b{display:block;margin-bottom:4px}
+.honest{border-left:3px solid var(--warn);padding:2px 0 2px 16px;margin:24px 0;color:var(--dim)}
+footer{border-top:1px solid var(--line);margin-top:48px;padding:24px 0 40px;color:var(--dim);font-size:14px}
+footer a{color:var(--dim)}
+a{color:var(--acc)}
+@media(max-width:520px){h1{font-size:25px}.counter .num{font-size:42px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header><div class="logo">Слоты <span>Prenot@mi</span> · Белград</div></header>
+
+<h1>Запись на визу Италии в Белграде открывается редко и разбирается за минуты</h1>
+<p class="sub">Бот проверяет портал Prenot@mi и пишет в Telegram, как только на шенгенскую визу в консульстве Италии в Белграде появляются свободные слоты.</p>
+
+<div class="counter">
+  <div class="num" id="days">—</div>
+  <div class="lbl">дней без новых слотов</div>
+  <div class="since">последняя массовая выкладка — 24 июня 2026</div>
+</div>
+
+<a class="cta" id="cta-top" href="https://t.me/italy_belgrade_slots" rel="noopener" onclick="try{track('tg_click_top')}catch(e){}">Подписаться на канал</a>
+<p class="cta-note">Бесплатно. Пароль от Prenot@mi не нужен — бот не заходит в ваш аккаунт.</p>
+
+<h2>Что делает бот</h2>
+<div class="card"><b>Следит за порталом</b>Проверяет страницу записи на шенгенскую визу в консульском округе Белграда.</div>
+<div class="card"><b>Пишет в момент появления</b>Как только слоты открываются, в канал уходит сообщение. Дальше вы записываетесь сами, со своей учётной записи.</div>
+<div class="card"><b>Показывает тишину</b>Пока слотов нет, видно, сколько дней их нет. Это тоже ответ: значит, обновлять страницу каждые полчаса бессмысленно.</div>
+
+<div class="honest">
+<p><b>Чего бот не делает.</b> Не бронирует за вас, не просит логин и пароль, не заходит в ваш личный кабинет и не гарантирует, что слот достанется именно вам. Запись на приём в консульстве бесплатна, и получить её можно только самому — это прямо сказано на сайте посольства Италии в Белграде.</p>
+</div>
+
+<h2>Почему слотов не найти</h2>
+<p>Консульство не выкладывает записи равномерно. Свободные даты появляются пачкой, без объявления, и уходят быстрее, чем большинство успевает открыть страницу. Между выкладками портал неделями показывает «нет свободных дат» — и это не ошибка сайта.</p>
+<p>Отсюда два способа потерять время: обновлять Prenot@mi вручную по многу раз в день и не попадать в момент, либо не обновлять вовсе и пропустить выкладку целиком.</p>
+
+<h2>Что можно сделать бесплатно прямо сейчас</h2>
+<ul>
+<li><b>Завести аккаунт заранее.</b> Регистрация на Prenot@mi занимает время, а в момент выкладки его не будет.</li>
+<li><b>Держать документы готовыми.</b> Слот без пакета документов не поможет.</li>
+<li><b>Подтвердить запись, когда получите.</b> За 10 дней до визита и не позднее чем за три дня запись надо подтвердить на портале — иначе она сгорает. Об этом многие узнают уже после того, как запись пропала.</li>
+<li><b>Подписаться на канал</b>, чтобы не проверять портал руками.</li>
+</ul>
+
+<h2>Частые вопросы</h2>
+
+<h3>Что такое Prenot@mi?</h3>
+<p>Prenot@mi — официальный портал записи на приём в консульства и посольства Италии, <a href="https://prenotami.esteri.it/" rel="nofollow noopener">prenotami.esteri.it</a>. Через него записываются и на шенгенскую визу в Белграде. Другого способа записаться нет.</p>
+
+<h3>Нужен ли боту мой пароль?</h3>
+<p>Нет. Бот смотрит на страницу записи и сообщает о появлении слотов. Логин, пароль и почта остаются только у вас.</p>
+
+<h3>Сколько это стоит?</h3>
+<p>Канал бесплатный. Сама запись в консульстве тоже бесплатна — посольство Италии в Белграде просит сообщать ему о любых требованиях денег за запись.</p>
+
+<h3>Слоты появятся вообще?</h3>
+<p>Мы не знаем. Выкладки случаются нерегулярно, и последняя была 24 июня 2026 года. Счётчик наверху показывает реальное положение дел, а не обещание.</p>
+
+<h3>Я подаюсь не в Белграде. Подойдёт?</h3>
+<p>Пока нет. Канал следит за консульским округом Белграда. Если нужен другой округ — напишите в канале, какой именно.</p>
+
+<a class="cta" id="cta-bottom" href="https://t.me/italy_belgrade_slots" rel="noopener" onclick="try{track('tg_click_bottom')}catch(e){}">Подписаться на канал</a>
+<p class="cta-note">Сообщение придёт в Telegram. Отписаться можно в любой момент.</p>
+
+<footer>
+<p>Сайт не связан с МИД Италии, посольством Италии в Белграде и порталом Prenot@mi. Запись на приём предоставляется консульством бесплатно.</p>
+<p><a href="privacy.html">Политика обработки данных</a></p>
+</footer>
+
+</div>
+<script src="smoke.js"></script>
+<script>
+(function(){
+  var last = new Date(2026,5,24); // 24 июня 2026
+  var d = Math.floor((Date.now()-last.getTime())/86400000);
+  var el = document.getElementById('days');
+  if(el && d>0) el.textContent = d;
+})();
+</script>
+</body>
+</html>
