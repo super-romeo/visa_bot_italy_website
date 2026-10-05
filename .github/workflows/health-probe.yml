@@ -23,7 +23,7 @@ jobs:
             h = dom.to_hash rescue { error: $!.class.name + ": " + $!.message }
             keep = %i[dns_resolves is_valid reason is_https_eligible caa_error is_cname_to_github_user_domain]
             puts "== #{d}"
-            keep.each { |k| puts "  #{k}: #{h[k].inspect}" }
+            keep.each { |k| puts "  #{k}: #{(h[k].nil? ? h[k.to_s] : h[k]).inspect}" }
             begin
               caa = dom.send(:caa)
               puts "  caa.errored?: #{caa.errored?.inspect}  caa.error: #{caa.error.inspect}"
