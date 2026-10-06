@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Слоты Prenot@mi — Италия, Белград: бот сообщает, когда появляется запись</title>
-<meta name="description" content="Свободные слоты на визу Италии в консульстве в Белграде появляются без объявления и разбираются за минуты. Бот проверяет портал Prenot@mi и пишет в Telegram-канал, как только запись открывается. Бесплатно.">
+<meta name="description" content="Свободные слоты на визу Италии в консульстве в Белграде появляются без объявления и разбираются за минуты. Бот проверяет портал Prenot@mi и сразу пишет вам в Telegram, как только запись открывается. Бесплатный канал — с задержкой 5 минут.">
 <link rel="canonical" href="https://sloty.veridok.ru/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Слоты Prenot@mi — Италия, Белград">
@@ -37,6 +37,7 @@ p{margin:0 0 14px}
 .vidy small{display:block;color:var(--dim);font-size:12px;margin-top:2px}
 .cta{display:block;text-align:center;background:var(--acc);color:#0b0d11;text-decoration:none;font-weight:700;font-size:18px;padding:16px 20px;border-radius:12px;margin:22px 0 8px}
 .cta:hover{filter:brightness(1.08)}
+.cta-free{background:transparent;color:var(--fg);border:1px solid var(--line);font-weight:600;font-size:16px;padding:12px 20px}
 .cta-note{color:var(--dim);font-size:14px;text-align:center;margin-bottom:30px}
 ul{margin:0 0 14px;padding-left:22px}
 li{margin-bottom:8px}
@@ -55,19 +56,22 @@ a{color:var(--acc)}
 <header><div class="logo">Слоты <span>Prenot@mi</span> · Белград</div></header>
 
 <h1>Запись на визу Италии в Белграде открывается без объявления и разбирается за минуты</h1>
-<p class="sub">Бот проверяет портал Prenot@mi и пишет в Telegram, как только на шенгенскую визу в консульстве Италии в Белграде появляются свободные слоты.</p>
+<p class="sub">Бот проверяет портал Prenot@mi и сразу пишет вам в Telegram, как только в консульстве Италии в Белграде открывается запись — по тем типам виз, которые вы выбрали.</p>
 
 <div class="counter">
   <div class="lbl">Когда последний раз открывалась запись — по сообщениям канала</div>
   <table class="vidy"><thead><tr><th>Тип визы</th><th>Дней назад</th></tr></thead><tbody id="vidy"></tbody></table>
 </div>
 
-<a class="cta" id="cta-top" href="https://t.me/italy_belgrade_slots" rel="noopener" onclick="try{track('tg_click_top')}catch(e){}">Подписаться на канал</a>
-<p class="cta-note">Бесплатно. Пароль от Prenot@mi не нужен — бот не заходит в ваш аккаунт.</p>
+<a class="cta" id="cta-top" href="BOT_URL" rel="noopener" onclick="try{track('bot_click_top')}catch(e){}">Получать сразу — 20 € / 3 месяца</a>
+<p class="cta-note">Или 2000 ₽. Пароль от Prenot@mi не нужен — бот не заходит в ваш аккаунт.</p>
+<a class="cta cta-free" id="cta-free-top" href="https://t.me/italy_belgrade_slots" rel="noopener" onclick="try{track('tg_click_top')}catch(e){}">Бесплатный канал — через 5 минут</a>
+<p class="cta-note">Тот же сигнал, но позже: места часто разбирают быстрее.</p>
 
 <h2>Что делает бот</h2>
 <div class="card"><b>Следит за порталом</b>Проверяет страницу записи на шенгенскую визу в консульском округе Белграда.</div>
-<div class="card"><b>Пишет в момент появления</b>Как только слоты открываются, в канал уходит сообщение. Дальше вы записываетесь сами, со своей учётной записи.</div>
+<div class="card"><b>Пишет вам лично в момент появления</b>Как только открывается запись по выбранным вами типам виз, бот сразу присылает личное сообщение. Дальше вы записываетесь сами, со своей учётной записи.</div>
+<div class="card"><b>Только нужные типы виз</b>Отметьте в боте, что вам нужно: туризм, работа и воссоединение семьи, учёба, цифровой кочевник, шенген для членов семей граждан ЕС. Можно несколько.</div>
 <div class="card"><b>Показывает, когда открывалось</b>Таблица наверху берёт из сообщений канала, когда последний раз открывалась запись по каждому типу визы, и обновляется сама.</div>
 
 <div class="honest">
@@ -95,7 +99,7 @@ a{color:var(--acc)}
 <p>Нет. Бот смотрит на страницу записи и сообщает о появлении слотов. Логин, пароль и почта остаются только у вас.</p>
 
 <h3>Сколько это стоит?</h3>
-<p>Канал бесплатный. Сама запись в консульстве тоже бесплатна — посольство Италии в Белграде просит сообщать ему о любых требованиях денег за запись.</p>
+<p>Мгновенные уведомления в боте — 20 € или 2000 ₽ за 3 месяца, оплата картой или звёздами Telegram. Вы платите за скорость сообщения, а не за запись: сама запись в консульстве бесплатна, и посольство Италии в Белграде просит сообщать ему о любых требованиях денег за неё. Бесплатный канал @italy_belgrade_slots присылает то же сообщение через 5 минут.</p>
 
 <h3>Как часто открывается запись?</h3>
 <p>Нерегулярно: по разным видам виз в разные дни, без расписания. Таблица наверху показывает, сколько дней прошло с последнего открытия по каждому типу визы, — это факт из сообщений канала, а не прогноз.</p>
@@ -103,7 +107,7 @@ a{color:var(--acc)}
 <h3>Я подаюсь не в Белграде. Подойдёт?</h3>
 <p>Пока нет. Канал следит за консульским округом Белграда. Если нужен другой округ — напишите в канале, какой именно.</p>
 
-<a class="cta" id="cta-bottom" href="https://t.me/italy_belgrade_slots" rel="noopener" onclick="try{track('tg_click_bottom')}catch(e){}">Подписаться на канал</a>
+<a class="cta" id="cta-bottom" href="BOT_URL" rel="noopener" onclick="try{track('bot_click_bottom')}catch(e){}">Получать сразу — 20 € / 3 месяца</a>
 <p class="cta-note">Сообщение придёт в Telegram. Отписаться можно в любой момент.</p>
 
 <footer>
