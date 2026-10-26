@@ -6,8 +6,10 @@
 """
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ZDES = Path(__file__).resolve().parent
 sys.path.insert(0, str(ZDES.parent))
@@ -53,7 +55,8 @@ class Snimok(unittest.TestCase):
         # 28.09 15:27:36 — ответ-комментарий «Слот был, но забрали за 2 минуты»
         # с цитатой «Туризм — ОТКРЫЛАСЬ ЗАПИСЬ». Сочти цитату — Туризм уедет на 15:27.
         # По парам, а не по po_vidam: у ответа 15:27 нет 👍, и фильтр лайков скрыл бы ошибку.
-        self.assertFalse([t for t, s in lo.soobshcheniya(SNIMOK) if t.startswith("2026-09-28T15:27") and lo.METKA in s])
+        self.assertFalse([t for t, s in lo.soobshcheniya(SNIMOK)
+                          if t.startswith("2026-09-28T15:27") and any(m in s for m in lo.LABELS)])
 
     def test_layki_iz_snimka(self):
         # Число 👍 у сообщений снимка: 8 — семь, 10 — ни одного, 18 — ни одного.
@@ -124,6 +127,67 @@ class Layki(unittest.TestCase):
         pozdnee = soobshchenie(self.OTKR, vremya="2026-09-05T10:00:00+00:00")
         self.assertEqual(self.vidy(rannee, pozdnee), {"Туризм": "2026-09-02T10:00:00+00:00"})
 
+
+class NewLabel(unittest.TestCase):
+    """С 12.10.2026 бот пишет «СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ»; сайт знал только «ОТКРЫЛАСЬ ЗАПИСЬ»
+    и с 14.10 не узнал ни одной новости — Шенген для семей ЕС стоял на 23.09 при новости 26.10."""
+
+    SNAPSHOT_26 = (ZDES / "lenta-2026-10-26.html").read_text(encoding="utf-8")
+
+    def test_snapshot_26_october(self):
+        # Первая страница ленты 26.10.2026 ~10:40 UTC: №42 (09:02, 👍 2) и №40 (23.10, 👍 1).
+        types = lo.po_vidam(self.SNAPSHOT_26)
+        self.assertEqual(types["Шенген: бизнес / транзит / спорт / туризм для членов семьи граждан ЕС"],
+                         "2026-10-26T09:02:13+00:00")
+        self.assertEqual(types["Работа по найму / Воссоединение семьи / Другие национальные визы"],
+                         "2026-10-23T14:49:47+00:00")
+
+    def test_snapshots_have_no_unknown_news(self):
+        # Обе ленты: новости бота со старой и с новой меткой; комментарии, опрос, ответ с цитатой.
+        # Граница: снимок — одна страница; весь канал 26.10 проверен прогоном по живой ленте — пусто.
+        self.assertEqual(lo.unknown_news(lo.messages(self.SNAPSHOT_26)), [])
+        self.assertEqual(lo.unknown_news(lo.messages(SNIMOK)), [])
+
+    def test_unknown_label_is_visible(self):
+        # Любой вид метки: заглавными, строчными, с предлогом — новость узнаётся по 🟢.
+        # Знакомая метка с продолжением — другая метка (внешний разбор, круг 2).
+        for label in ("ПОЯВИЛИСЬ СЛОТЫ", "Форма записи доступна", "ОТКРЫТА И ДОСТУПНА",
+                      "ОТКРЫЛАСЬ ЗАПИСЬЮ", "ОТКРЫЛАСЬ ЗАПИСЬ ЕЩЁ", "СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ СНОВА"):
+            html = soobshchenie(f"🇮🇹 Консульство Италии, Белград 🟢 Туризм — {label} Записаться → x",
+                                reactions=[("👍", 1)], post=50)
+            self.assertEqual(lo.unknown_news(lo.messages(f"<html>{html}</html>")), [50], label)
+            # Незнакомая метка открытием не считается: что она значит, решает человек, дописав LABELS.
+            self.assertEqual(lo.po_vidam(f"<html>{html}</html>"), {}, label)
+
+    def test_quote_with_unknown_label_no_alarm(self):
+        # Цитата новости в ответе — не новость: ни открытия, ни тревоги (внешний разбор, gpt).
+        quote = '<div class="tgme_widget_message_text js-message_reply_text">🟢 Туризм — ПОЯВИЛИСЬ СЛОТЫ</div>'
+        html = soobshchenie("Слот был, но забрали", do_teksta=quote, reactions=[("👍", 1)], post=51)
+        self.assertEqual(lo.unknown_news(lo.messages(f"<html>{html}</html>")), [])
+
+    def test_type_with_hyphen(self):
+        # Тип берётся как до 26.10: до тире перед меткой, а не до первого тире.
+        html = soobshchenie("🟢 Виза D-TYPE — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", vremya="2026-10-26T09:00:00+00:00",
+                            reactions=[("👍", 1)])
+        self.assertEqual(lo.po_vidam(f"<html>{html}</html>"), {"Виза D-TYPE": "2026-10-26T09:00:00+00:00"})
+
+    def run_main(self, previous):
+        known = ("2026-10-26T09:02:13+00:00", "🟢 Туризм — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", 1, 2)
+        foreign = ("2026-10-26T10:00:00+00:00", "🟢 Учёба — ПОЯВИЛИСЬ СЛОТЫ", 1, 3)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "last.json"
+            if previous is not None:
+                path.write_text(json.dumps(previous, ensure_ascii=False), encoding="utf-8")
+            with mock.patch.object(lo, "FAIL", path), \
+                    mock.patch.object(lo, "whole_channel", lambda: [known, foreign]):
+                code = lo.main()
+            return code, json.loads(path.read_text(encoding="utf-8"))
+
+    def test_main_fails_but_writes_table(self):
+        table = {"vidy": [{"vid": "Туризм", "last": "2026-10-26T09:02:13+00:00"}]}
+        self.assertEqual(self.run_main(None), (2, table))
+        # Таблица без перемен — всё равно красный: иначе краснел бы один прогон, а дальше молчание.
+        self.assertEqual(self.run_main(table), (2, table))
 
 class Listanie(unittest.TestCase):
     """Лента листается назад до начала; не дочитали — None, файл не трогаем."""
