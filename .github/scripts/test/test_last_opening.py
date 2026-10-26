@@ -4,6 +4,8 @@
 разбором регулярками до замены на html.parser (ход 206 узла Prenot@mi).
 Запуск: python -m unittest discover -s .github/scripts/test
 """
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -178,9 +180,13 @@ class NewLabel(unittest.TestCase):
             path = Path(folder) / "last.json"
             if previous is not None:
                 path.write_text(json.dumps(previous, ensure_ascii=False), encoding="utf-8")
+            # Вывод — в буфер: «::error::» в выводе заслона GitHub показал бы настоящей тревогой.
+            output = io.StringIO()
             with mock.patch.object(lo, "FAIL", path), \
-                    mock.patch.object(lo, "whole_channel", lambda: [known, foreign]):
+                    mock.patch.object(lo, "whole_channel", lambda: [known, foreign]), \
+                    contextlib.redirect_stdout(output):
                 code = lo.main()
+            self.assertIn("::error::", output.getvalue())
             return code, json.loads(path.read_text(encoding="utf-8"))
 
     def test_main_fails_but_writes_table(self):
