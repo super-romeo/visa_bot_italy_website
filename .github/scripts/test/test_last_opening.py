@@ -6,8 +6,10 @@
 """
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ZDES = Path(__file__).resolve().parent
 sys.path.insert(0, str(ZDES.parent))
@@ -53,7 +55,8 @@ class Snimok(unittest.TestCase):
         # 28.09 15:27:36 — ответ-комментарий «Слот был, но забрали за 2 минуты»
         # с цитатой «Туризм — ОТКРЫЛАСЬ ЗАПИСЬ». Сочти цитату — Туризм уедет на 15:27.
         # По парам, а не по po_vidam: у ответа 15:27 нет 👍, и фильтр лайков скрыл бы ошибку.
-        self.assertFalse([t for t, s in lo.soobshcheniya(SNIMOK) if t.startswith("2026-09-28T15:27") and lo.METKA in s])
+        self.assertFalse([t for t, s in lo.soobshcheniya(SNIMOK)
+                          if t.startswith("2026-09-28T15:27") and any(m in s for m in lo.LABELS)])
 
     def test_layki_iz_snimka(self):
         # Число 👍 у сообщений снимка: 8 — семь, 10 — ни одного, 18 — ни одного.
@@ -123,6 +126,42 @@ class Layki(unittest.TestCase):
         rannee = soobshchenie(self.OTKR, vremya="2026-09-02T10:00:00+00:00", reactions=[("👍", 2)])
         pozdnee = soobshchenie(self.OTKR, vremya="2026-09-05T10:00:00+00:00")
         self.assertEqual(self.vidy(rannee, pozdnee), {"Туризм": "2026-09-02T10:00:00+00:00"})
+
+
+class NewLabel(unittest.TestCase):
+    """С 12.10.2026 бот пишет «СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ»; сайт знал только «ОТКРЫЛАСЬ ЗАПИСЬ»
+    и с 14.10 не узнал ни одной новости — Шенген для семей ЕС стоял на 23.09 при новости 26.10."""
+
+    SNIMOK_26 = (ZDES / "lenta-2026-10-26.html").read_text(encoding="utf-8")
+
+    def test_snimok_26_oktyabrya(self):
+        # Первая страница ленты 26.10.2026 ~10:40 UTC: №42 (09:02, 👍 2) и №40 (23.10, 👍 1).
+        vidy = lo.po_vidam(self.SNIMOK_26)
+        self.assertEqual(vidy["Шенген: бизнес / транзит / спорт / туризм для членов семьи граждан ЕС"],
+                         "2026-10-26T09:02:13+00:00")
+        self.assertEqual(vidy["Работа по найму / Воссоединение семьи / Другие национальные визы"],
+                         "2026-10-23T14:49:47+00:00")
+
+    def test_v_snimke_net_neznakomyh_metok(self):
+        self.assertEqual(lo.unknown_labels(lo.messages(self.SNIMOK_26)), set())
+
+    def test_neznakomaya_metka_vidna(self):
+        st = soobshchenie("🇮🇹 Консульство Италии, Белград 🟢 Туризм — ПОЯВИЛИСЬ СЛОТЫ Записаться → x",
+                          reactions=[("👍", 1)])
+        self.assertEqual(lo.unknown_labels(lo.messages(f"<html>{st}</html>")), {"ПОЯВИЛИСЬ СЛОТЫ"})
+        # Незнакомая метка открытием не считается: что она значит, решает человек, дописав LABELS.
+        self.assertEqual(lo.po_vidam(f"<html>{st}</html>"), {})
+
+    def test_main_krasneet_no_pishet_tablitsu(self):
+        znakomaya = ("2026-10-26T09:02:13+00:00", "🟢 Туризм — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", 1, 2)
+        chuzhaya = ("2026-10-26T10:00:00+00:00", "🟢 Учёба — ПОЯВИЛИСЬ СЛОТЫ", 1, 3)
+        with tempfile.TemporaryDirectory() as papka:
+            fail = Path(papka) / "last.json"
+            with mock.patch.object(lo, "FAIL", fail), \
+                    mock.patch.object(lo, "whole_channel", lambda: [znakomaya, chuzhaya]):
+                self.assertEqual(lo.main(), 2)
+            self.assertEqual(json.loads(fail.read_text(encoding="utf-8")),
+                             {"vidy": [{"vid": "Туризм", "last": "2026-10-26T09:02:13+00:00"}]})
 
 
 class Listanie(unittest.TestCase):

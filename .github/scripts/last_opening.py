@@ -1,4 +1,9 @@
-"""Последнее «ОТКРЫЛАСЬ ЗАПИСЬ» в канале по каждому типу визы → last.json.
+"""Последнее открытие записи в канале по каждому типу визы → last.json.
+
+Открытие — новость бота «🟢 <тип визы> — <метка>». Метка с 12.10.2026 — «СТАЛА ДОСТУПНА ФОРМА
+ЗАПИСИ» (слово Владельца; текст задаёт visa_bot_italy, src/channel.js), до того — «ОТКРЫЛАСЬ
+ЗАПИСЬ»: старые новости в ленте остаются с ней. Сайт знал только старую и с 14.10 не узнал ни
+одной новости. Незнакомая метка — тревога: таблица пишется по знакомым, а прогон краснеет.
 
 Открытием считается только сообщение, у которого есть хотя бы одна реакция 👍
 (слово Владельца 11.10.2026: «считать появлением слотов только если у
@@ -24,7 +29,10 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 KANAL = "italy_belgrade_slots"
-METKA = "ОТКРЫЛАСЬ ЗАПИСЬ"
+LABELS = ("ОТКРЫЛАСЬ ЗАПИСЬ", "СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ")
+# «🟢 <тип> — <МЕТКА ЗАГЛАВНЫМИ> Записаться → …»: так бот пишет любую новость о слоте, какой бы
+# ни была метка. Слово метки — от двух заглавных, иначе метка заберёт «З» из «Записаться».
+NEWS = re.compile(r"🟢\s*(.*?)\s*[—-]\s*([А-ЯЁA-Z]{2,}(?: [А-ЯЁA-Z]{2,})*)")
 THUMBS_UP = "👍"
 FAIL = Path(__file__).resolve().parents[2] / "last.json"
 # Страниц ленты не больше этого: канал — десятки сообщений, страница — около двадцати.
@@ -142,10 +150,16 @@ def po_vidam(soobshch) -> dict:
         soobshch = messages(soobshch)
     itog = {}
     for t, s, thumbs, _ in soobshch:
-        vid = re.search(r"🟢\s*(.*?)\s*[—-]\s*" + METKA, s)
-        if vid and thumbs >= 1 and t > itog.get(vid.group(1), ""):
+        vid = NEWS.search(s)
+        if vid and vid.group(2) in LABELS and thumbs >= 1 and t > itog.get(vid.group(1), ""):
             itog[vid.group(1)] = t
     return itog
+
+
+def unknown_labels(soobshch) -> set:
+    """Метки новостей бота, которых разбор не знает: сменили текст — сайт ослеп бы молча."""
+    found = (NEWS.search(s) for _, s, _, _ in soobshch)
+    return {m.group(2) for m in found if m} - set(LABELS)
 
 
 def fetch_page(before=None) -> str:
@@ -200,10 +214,15 @@ def main() -> int:
     staroe = json.loads(FAIL.read_text(encoding="utf-8")) if FAIL.exists() else {}
     if novoe == {v["vid"]: v["last"] for v in staroe.get("vidy", [])}:
         print("без перемен")
-        return 0
-    stroki = sorted(({"vid": v, "last": t} for v, t in novoe.items()), key=lambda r: r["last"], reverse=True)
-    FAIL.write_text(json.dumps({"vidy": stroki}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    print("записано:", stroki)
+    else:
+        stroki = sorted(({"vid": v, "last": t} for v, t in novoe.items()), key=lambda r: r["last"], reverse=True)
+        FAIL.write_text(json.dumps({"vidy": stroki}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print("записано:", stroki)
+    unknown = unknown_labels(vse)
+    if unknown:
+        # Таблица по знакомым меткам записана; красный прогон — чтобы смену текста увидели.
+        print(f"::error::незнакомая метка новости в канале: {sorted(unknown)} — допиши в LABELS")
+        return 2
     return 0
 
 
