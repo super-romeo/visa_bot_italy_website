@@ -132,54 +132,60 @@ class NewLabel(unittest.TestCase):
     """С 12.10.2026 бот пишет «СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ»; сайт знал только «ОТКРЫЛАСЬ ЗАПИСЬ»
     и с 14.10 не узнал ни одной новости — Шенген для семей ЕС стоял на 23.09 при новости 26.10."""
 
-    SNIMOK_26 = (ZDES / "lenta-2026-10-26.html").read_text(encoding="utf-8")
+    SNAPSHOT_26 = (ZDES / "lenta-2026-10-26.html").read_text(encoding="utf-8")
 
-    def test_snimok_26_oktyabrya(self):
+    def test_snapshot_26_october(self):
         # Первая страница ленты 26.10.2026 ~10:40 UTC: №42 (09:02, 👍 2) и №40 (23.10, 👍 1).
-        vidy = lo.po_vidam(self.SNIMOK_26)
-        self.assertEqual(vidy["Шенген: бизнес / транзит / спорт / туризм для членов семьи граждан ЕС"],
+        types = lo.po_vidam(self.SNAPSHOT_26)
+        self.assertEqual(types["Шенген: бизнес / транзит / спорт / туризм для членов семьи граждан ЕС"],
                          "2026-10-26T09:02:13+00:00")
-        self.assertEqual(vidy["Работа по найму / Воссоединение семьи / Другие национальные визы"],
+        self.assertEqual(types["Работа по найму / Воссоединение семьи / Другие национальные визы"],
                          "2026-10-23T14:49:47+00:00")
 
-    def test_v_snimkah_net_neznakomyh_novostey(self):
+    def test_snapshots_have_no_unknown_news(self):
         # Обе ленты: новости бота со старой и с новой меткой; комментарии, опрос, ответ с цитатой.
-        self.assertEqual(lo.unknown_news(lo.messages(self.SNIMOK_26)), [])
+        # Граница: снимок — одна страница; весь канал 26.10 проверен прогоном по живой ленте — пусто.
+        self.assertEqual(lo.unknown_news(lo.messages(self.SNAPSHOT_26)), [])
         self.assertEqual(lo.unknown_news(lo.messages(SNIMOK)), [])
 
-    def test_neznakomaya_metka_vidna(self):
+    def test_unknown_label_is_visible(self):
         # Любой вид метки: заглавными, строчными, с предлогом — новость узнаётся по 🟢.
-        for metka in ("ПОЯВИЛИСЬ СЛОТЫ", "Форма записи доступна", "ОТКРЫТА И ДОСТУПНА"):
-            st = soobshchenie(f"🇮🇹 Консульство Италии, Белград 🟢 Туризм — {metka} Записаться → x",
-                              reactions=[("👍", 1)], post=50)
-            self.assertEqual(lo.unknown_news(lo.messages(f"<html>{st}</html>")), [50], metka)
+        for label in ("ПОЯВИЛИСЬ СЛОТЫ", "Форма записи доступна", "ОТКРЫТА И ДОСТУПНА"):
+            html = soobshchenie(f"🇮🇹 Консульство Италии, Белград 🟢 Туризм — {label} Записаться → x",
+                                reactions=[("👍", 1)], post=50)
+            self.assertEqual(lo.unknown_news(lo.messages(f"<html>{html}</html>")), [50], label)
             # Незнакомая метка открытием не считается: что она значит, решает человек, дописав LABELS.
-            self.assertEqual(lo.po_vidam(f"<html>{st}</html>"), {}, metka)
+            self.assertEqual(lo.po_vidam(f"<html>{html}</html>"), {}, label)
 
-    def test_tip_s_defisom(self):
+    def test_quote_with_unknown_label_no_alarm(self):
+        # Цитата новости в ответе — не новость: ни открытия, ни тревоги (внешний разбор, gpt).
+        quote = '<div class="tgme_widget_message_text js-message_reply_text">🟢 Туризм — ПОЯВИЛИСЬ СЛОТЫ</div>'
+        html = soobshchenie("Слот был, но забрали", do_teksta=quote, reactions=[("👍", 1)], post=51)
+        self.assertEqual(lo.unknown_news(lo.messages(f"<html>{html}</html>")), [])
+
+    def test_type_with_hyphen(self):
         # Тип берётся как до 26.10: до тире перед меткой, а не до первого тире.
-        st = soobshchenie("🟢 Виза D-TYPE — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", vremya="2026-10-26T09:00:00+00:00",
-                          reactions=[("👍", 1)])
-        self.assertEqual(lo.po_vidam(f"<html>{st}</html>"), {"Виза D-TYPE": "2026-10-26T09:00:00+00:00"})
+        html = soobshchenie("🟢 Виза D-TYPE — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", vremya="2026-10-26T09:00:00+00:00",
+                            reactions=[("👍", 1)])
+        self.assertEqual(lo.po_vidam(f"<html>{html}</html>"), {"Виза D-TYPE": "2026-10-26T09:00:00+00:00"})
 
-    def main_s(self, staroe):
-        znakomaya = ("2026-10-26T09:02:13+00:00", "🟢 Туризм — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", 1, 2)
-        chuzhaya = ("2026-10-26T10:00:00+00:00", "🟢 Учёба — ПОЯВИЛИСЬ СЛОТЫ", 1, 3)
-        with tempfile.TemporaryDirectory() as papka:
-            fail = Path(papka) / "last.json"
-            if staroe is not None:
-                fail.write_text(json.dumps(staroe, ensure_ascii=False), encoding="utf-8")
-            with mock.patch.object(lo, "FAIL", fail), \
-                    mock.patch.object(lo, "whole_channel", lambda: [znakomaya, chuzhaya]):
-                kod = lo.main()
-            return kod, json.loads(fail.read_text(encoding="utf-8"))
+    def run_main(self, previous):
+        known = ("2026-10-26T09:02:13+00:00", "🟢 Туризм — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", 1, 2)
+        foreign = ("2026-10-26T10:00:00+00:00", "🟢 Учёба — ПОЯВИЛИСЬ СЛОТЫ", 1, 3)
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "last.json"
+            if previous is not None:
+                path.write_text(json.dumps(previous, ensure_ascii=False), encoding="utf-8")
+            with mock.patch.object(lo, "FAIL", path), \
+                    mock.patch.object(lo, "whole_channel", lambda: [known, foreign]):
+                code = lo.main()
+            return code, json.loads(path.read_text(encoding="utf-8"))
 
-    def test_main_krasneet_no_pishet_tablitsu(self):
-        tablitsa = {"vidy": [{"vid": "Туризм", "last": "2026-10-26T09:02:13+00:00"}]}
-        self.assertEqual(self.main_s(None), (2, tablitsa))
+    def test_main_fails_but_writes_table(self):
+        table = {"vidy": [{"vid": "Туризм", "last": "2026-10-26T09:02:13+00:00"}]}
+        self.assertEqual(self.run_main(None), (2, table))
         # Таблица без перемен — всё равно красный: иначе краснел бы один прогон, а дальше молчание.
-        self.assertEqual(self.main_s(tablitsa), (2, tablitsa))
-
+        self.assertEqual(self.run_main(table), (2, table))
 
 class Listanie(unittest.TestCase):
     """Лента листается назад до начала; не дочитали — None, файл не трогаем."""
