@@ -33,7 +33,10 @@ KANAL = "italy_belgrade_slots"
 LABELS = ("ОТКРЫЛАСЬ ЗАПИСЬ", "СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ")
 NEWS_MARK = "🟢"  # у бота этим значком начинается только новость о слоте (visa_bot_italy, ZNACHKI)
 # «🟢 <тип> — <метка>»; тип берётся тем же выражением, что и до 26.10, — только меток теперь две.
-OPENING = re.compile(NEWS_MARK + r"\s*(.*?)\s*[—-]\s*(?:" + "|".join(map(re.escape, LABELS)) + ")")
+# Метка — целиком: за ней не буква и не слово заглавными («ЗАПИСЬЮ», «ЗАПИСЬ ЕЩЁ» — другая метка,
+# тревога), а «Записаться →» бота проходит (внешний разбор, круг 2: gpt, gemini, grok).
+OPENING = re.compile(NEWS_MARK + r"\s*(.*?)\s*[—-]\s*(?:" + "|".join(map(re.escape, LABELS))
+                     + r")(?![А-ЯЁA-Zа-яёa-z]|\s+[А-ЯЁA-Z]{2})")
 THUMBS_UP = "👍"
 FAIL = Path(__file__).resolve().parents[2] / "last.json"
 # Страниц ленты не больше этого: канал — десятки сообщений, страница — около двадцати.
@@ -164,7 +167,7 @@ def unknown_news(soobshch) -> list:
     значку, а не по виду метки: метку могут написать и строчными, и с предлогом. Граница: чужое
     сообщение с 🟢 тоже краснит прогон — каждый час, пока его не уберут или не допишут LABELS.
     """
-    return sorted(p for _, s, _, p in soobshch if NEWS_MARK in s and not OPENING.search(s))
+    return sorted({p for _, s, _, p in soobshch if NEWS_MARK in s and not OPENING.search(s)})
 
 
 def fetch_page(before=None) -> str:
