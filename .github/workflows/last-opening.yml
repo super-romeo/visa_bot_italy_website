@@ -22,10 +22,11 @@ jobs:
           python-version: "3.12"
       - name: Заслон разбора ленты
         run: python -m unittest discover -s .github/scripts/test
-      - run: python .github/scripts/last_opening.py
+      - id: parse
+        run: python .github/scripts/last_opening.py
       - name: Коммит, если дата сменилась
         # и при красном разборе: незнакомая метка краснит прогон, но таблица по знакомым уже записана
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.parse.outcome != 'skipped' }}
         run: |
           if git diff --quiet -- last.json; then exit 0; fi
           git config user.name "github-actions[bot]"

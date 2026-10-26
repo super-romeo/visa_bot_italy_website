@@ -142,26 +142,43 @@ class NewLabel(unittest.TestCase):
         self.assertEqual(vidy["Работа по найму / Воссоединение семьи / Другие национальные визы"],
                          "2026-10-23T14:49:47+00:00")
 
-    def test_v_snimke_net_neznakomyh_metok(self):
-        self.assertEqual(lo.unknown_labels(lo.messages(self.SNIMOK_26)), set())
+    def test_v_snimkah_net_neznakomyh_novostey(self):
+        # Обе ленты: новости бота со старой и с новой меткой; комментарии, опрос, ответ с цитатой.
+        self.assertEqual(lo.unknown_news(lo.messages(self.SNIMOK_26)), [])
+        self.assertEqual(lo.unknown_news(lo.messages(SNIMOK)), [])
 
     def test_neznakomaya_metka_vidna(self):
-        st = soobshchenie("🇮🇹 Консульство Италии, Белград 🟢 Туризм — ПОЯВИЛИСЬ СЛОТЫ Записаться → x",
-                          reactions=[("👍", 1)])
-        self.assertEqual(lo.unknown_labels(lo.messages(f"<html>{st}</html>")), {"ПОЯВИЛИСЬ СЛОТЫ"})
-        # Незнакомая метка открытием не считается: что она значит, решает человек, дописав LABELS.
-        self.assertEqual(lo.po_vidam(f"<html>{st}</html>"), {})
+        # Любой вид метки: заглавными, строчными, с предлогом — новость узнаётся по 🟢.
+        for metka in ("ПОЯВИЛИСЬ СЛОТЫ", "Форма записи доступна", "ОТКРЫТА И ДОСТУПНА"):
+            st = soobshchenie(f"🇮🇹 Консульство Италии, Белград 🟢 Туризм — {metka} Записаться → x",
+                              reactions=[("👍", 1)], post=50)
+            self.assertEqual(lo.unknown_news(lo.messages(f"<html>{st}</html>")), [50], metka)
+            # Незнакомая метка открытием не считается: что она значит, решает человек, дописав LABELS.
+            self.assertEqual(lo.po_vidam(f"<html>{st}</html>"), {}, metka)
 
-    def test_main_krasneet_no_pishet_tablitsu(self):
+    def test_tip_s_defisom(self):
+        # Тип берётся как до 26.10: до тире перед меткой, а не до первого тире.
+        st = soobshchenie("🟢 Виза D-TYPE — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", vremya="2026-10-26T09:00:00+00:00",
+                          reactions=[("👍", 1)])
+        self.assertEqual(lo.po_vidam(f"<html>{st}</html>"), {"Виза D-TYPE": "2026-10-26T09:00:00+00:00"})
+
+    def main_s(self, staroe):
         znakomaya = ("2026-10-26T09:02:13+00:00", "🟢 Туризм — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", 1, 2)
         chuzhaya = ("2026-10-26T10:00:00+00:00", "🟢 Учёба — ПОЯВИЛИСЬ СЛОТЫ", 1, 3)
         with tempfile.TemporaryDirectory() as papka:
             fail = Path(papka) / "last.json"
+            if staroe is not None:
+                fail.write_text(json.dumps(staroe, ensure_ascii=False), encoding="utf-8")
             with mock.patch.object(lo, "FAIL", fail), \
                     mock.patch.object(lo, "whole_channel", lambda: [znakomaya, chuzhaya]):
-                self.assertEqual(lo.main(), 2)
-            self.assertEqual(json.loads(fail.read_text(encoding="utf-8")),
-                             {"vidy": [{"vid": "Туризм", "last": "2026-10-26T09:02:13+00:00"}]})
+                kod = lo.main()
+            return kod, json.loads(fail.read_text(encoding="utf-8"))
+
+    def test_main_krasneet_no_pishet_tablitsu(self):
+        tablitsa = {"vidy": [{"vid": "Туризм", "last": "2026-10-26T09:02:13+00:00"}]}
+        self.assertEqual(self.main_s(None), (2, tablitsa))
+        # Таблица без перемен — всё равно красный: иначе краснел бы один прогон, а дальше молчание.
+        self.assertEqual(self.main_s(tablitsa), (2, tablitsa))
 
 
 class Listanie(unittest.TestCase):

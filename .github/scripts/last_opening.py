@@ -3,7 +3,8 @@
 Открытие — новость бота «🟢 <тип визы> — <метка>». Метка с 12.10.2026 — «СТАЛА ДОСТУПНА ФОРМА
 ЗАПИСИ» (слово Владельца; текст задаёт visa_bot_italy, src/channel.js), до того — «ОТКРЫЛАСЬ
 ЗАПИСЬ»: старые новости в ленте остаются с ней. Сайт знал только старую и с 14.10 не узнал ни
-одной новости. Незнакомая метка — тревога: таблица пишется по знакомым, а прогон краснеет.
+одной новости. Новость 🟢 без знакомой метки — тревога: таблица пишется по знакомым, а прогон
+краснеет.
 
 Открытием считается только сообщение, у которого есть хотя бы одна реакция 👍
 (слово Владельца 11.10.2026: «считать появлением слотов только если у
@@ -30,9 +31,9 @@ from pathlib import Path
 
 KANAL = "italy_belgrade_slots"
 LABELS = ("ОТКРЫЛАСЬ ЗАПИСЬ", "СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ")
-# «🟢 <тип> — <МЕТКА ЗАГЛАВНЫМИ> Записаться → …»: так бот пишет любую новость о слоте, какой бы
-# ни была метка. Слово метки — от двух заглавных, иначе метка заберёт «З» из «Записаться».
-NEWS = re.compile(r"🟢\s*(.*?)\s*[—-]\s*([А-ЯЁA-Z]{2,}(?: [А-ЯЁA-Z]{2,})*)")
+NEWS_MARK = "🟢"  # у бота этим значком начинается только новость о слоте (visa_bot_italy, ZNACHKI)
+# «🟢 <тип> — <метка>»; тип берётся тем же выражением, что и до 26.10, — только меток теперь две.
+OPENING = re.compile(NEWS_MARK + r"\s*(.*?)\s*[—-]\s*(?:" + "|".join(map(re.escape, LABELS)) + ")")
 THUMBS_UP = "👍"
 FAIL = Path(__file__).resolve().parents[2] / "last.json"
 # Страниц ленты не больше этого: канал — десятки сообщений, страница — около двадцати.
@@ -150,16 +151,20 @@ def po_vidam(soobshch) -> dict:
         soobshch = messages(soobshch)
     itog = {}
     for t, s, thumbs, _ in soobshch:
-        vid = NEWS.search(s)
-        if vid and vid.group(2) in LABELS and thumbs >= 1 and t > itog.get(vid.group(1), ""):
+        vid = OPENING.search(s)
+        if vid and thumbs >= 1 and t > itog.get(vid.group(1), ""):
             itog[vid.group(1)] = t
     return itog
 
 
-def unknown_labels(soobshch) -> set:
-    """Метки новостей бота, которых разбор не знает: сменили текст — сайт ослеп бы молча."""
-    found = (NEWS.search(s) for _, s, _, _ in soobshch)
-    return {m.group(2) for m in found if m} - set(LABELS)
+def unknown_news(soobshch) -> list:
+    """Номера новостей бота (со значком 🟢), в которых нет знакомой метки.
+
+    Сменили текст метки — сайт ослеп бы молча (так было с 14.10 по 26.10.2026). Узнаём новость по
+    значку, а не по виду метки: метку могут написать и строчными, и с предлогом. Граница: чужое
+    сообщение с 🟢 тоже краснит прогон — каждый час, пока его не уберут или не допишут LABELS.
+    """
+    return sorted(p for _, s, _, p in soobshch if NEWS_MARK in s and not OPENING.search(s))
 
 
 def fetch_page(before=None) -> str:
@@ -218,10 +223,10 @@ def main() -> int:
         stroki = sorted(({"vid": v, "last": t} for v, t in novoe.items()), key=lambda r: r["last"], reverse=True)
         FAIL.write_text(json.dumps({"vidy": stroki}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         print("записано:", stroki)
-    unknown = unknown_labels(vse)
+    unknown = unknown_news(vse)
     if unknown:
         # Таблица по знакомым меткам записана; красный прогон — чтобы смену текста увидели.
-        print(f"::error::незнакомая метка новости в канале: {sorted(unknown)} — допиши в LABELS")
+        print(f"::error::новость 🟢 без знакомой метки, сообщения {unknown} — допиши метку в LABELS")
         return 2
     return 0
 
