@@ -21,13 +21,14 @@ import last_opening as lo  # noqa: E402
 SNIMOK = (ZDES / "lenta-2026-10-01.html").read_text(encoding="utf-8")
 ETALON_PAR = [tuple(p) for p in json.loads((ZDES / "etalon-par-2026-10-01.json").read_text(encoding="utf-8"))]
 
-# По ленте 01.10.2026 вручную (ход 207 узла Prenot@mi), с правилом 👍 (11.10.2026):
-# Туризм 28.09 и Шенген 30.09 — без 👍 в снимке, поэтому в таблице прежние 21.09 и 23.09.
+# По ленте 01.10.2026 (ход 207 узла Prenot@mi), с правилом «нет ни одного 👎» (11.11.2026):
+# Туризм 28.09 (№11, 👎 18) и 29.09 (№12, 👎 11) не в счёт — в таблице прежний 21.09;
+# Шенген 30.09 18:11 без 👎 — в счёт.
 ETALON_VIDOV = {
     "Учёба": "2026-09-21T14:07:15+00:00",
     "Туризм": "2026-09-21T14:32:15+00:00",
     "Работа по найму / Воссоединение семьи / Другие национальные визы": "2026-09-23T07:52:15+00:00",
-    "Шенген: бизнес / транзит / спорт / туризм для членов семьи граждан ЕС": "2026-09-23T07:42:14+00:00",
+    "Шенген: бизнес / транзит / спорт / туризм для членов семьи граждан ЕС": "2026-09-30T18:11:29+00:00",
 }
 
 
@@ -56,14 +57,19 @@ class Snimok(unittest.TestCase):
     def test_tsitata_v_otvete_ne_otkrytie(self):
         # 28.09 15:27:36 — ответ-комментарий «Слот был, но забрали за 2 минуты»
         # с цитатой «Туризм — ОТКРЫЛАСЬ ЗАПИСЬ». Сочти цитату — Туризм уедет на 15:27.
-        # По парам, а не по po_vidam: у ответа 15:27 нет 👍, и фильтр лайков скрыл бы ошибку.
+        # По парам, а не по po_vidam: фильтр реакций мог бы скрыть ошибку разбора цитаты.
         self.assertFalse([t for t, s in lo.soobshcheniya(SNIMOK)
                           if t.startswith("2026-09-28T15:27") and any(m in s for m in lo.LABELS)])
 
     def test_layki_iz_snimka(self):
         # Число 👍 у сообщений снимка: 8 — семь, 10 — ни одного, 18 — ни одного.
-        layki = {p: th for _, _, th, p in lo.messages(SNIMOK)}
+        layki = {p: th for _, _, th, p, _ in lo.messages(SNIMOK)}
         self.assertEqual((layki[8], layki[10], layki[18]), (7, 0, 0))
+
+    def test_dizlayki_iz_snimka(self):
+        # Число 👎 у сообщений снимка: 11 — восемнадцать, 12 — одиннадцать, 18 — двадцать шесть, 8 — ни одного.
+        dizlayki = {p: dn for _, _, _, p, dn in lo.messages(SNIMOK)}
+        self.assertEqual((dizlayki[11], dizlayki[12], dizlayki[18], dizlayki[8]), (18, 11, 26, 0))
 
 
 class Sinteticheskie(unittest.TestCase):
@@ -97,7 +103,7 @@ class Sinteticheskie(unittest.TestCase):
 
     def test_tsitata_s_metkoy_ne_otkrytie(self):
         tsitata = f'<div class="tgme_widget_message_text js-message_reply_text">{self.METKA}</div>'
-        # 👍 у ответа есть: фильтр лайков не должен прятать ошибку разбора цитаты.
+        # 👎 у ответа нет: фильтр реакций не прячет ошибку разбора цитаты.
         st = f"<html>{soobshchenie('Слот был, но забрали за 2 минуты', do_teksta=tsitata, reactions=[('👍', 1)])}</html>"
         self.assertEqual(lo.po_vidam(st), {})
 
@@ -107,26 +113,28 @@ class Sinteticheskie(unittest.TestCase):
         self.assertEqual(para, [("2026-09-01T10:00:00+00:00", "а"), ("2026-09-03T10:00:00+00:00", "в")])
 
 
-class Layki(unittest.TestCase):
-    """Слово Владельца 11.10.2026: открытие — только сообщение, у которого есть 👍."""
+class Dizlayki(unittest.TestCase):
+    """Слово Владельца 11.11.2026: открытие — сообщение, у которого нет ни одного 👎
+    («давай считать выкладкой не если кто-то поставил лайк, а если никто не поставил дизлайк»)."""
     OTKR = "🇮🇹 Консульство Италии, Белград 🟢 Туризм — ОТКРЫЛАСЬ ЗАПИСЬ"
 
     def vidy(self, *kuski):
         return lo.po_vidam(f"<html>{''.join(kuski)}</html>")
 
-    def test_bez_layka_ne_otkrytie(self):
-        self.assertEqual(self.vidy(soobshchenie(self.OTKR)), {})
-
-    def test_drugaya_reaktsiya_ne_layk(self):
-        self.assertEqual(self.vidy(soobshchenie(self.OTKR, reactions=[("🤷‍♂", 3), ("👎", 5)])), {})
-
-    def test_layk_sredi_drugih(self):
-        st = soobshchenie(self.OTKR, vremya="2026-09-02T10:00:00+00:00", reactions=[("🤷‍♂", 3), ("👍", 1)])
+    def test_bez_reaktsiy_otkrytie(self):
+        st = soobshchenie(self.OTKR, vremya="2026-09-02T10:00:00+00:00")
         self.assertEqual(self.vidy(st), {"Туризм": "2026-09-02T10:00:00+00:00"})
 
-    def test_pozdnee_bez_layka_ne_perekryvaet(self):
-        rannee = soobshchenie(self.OTKR, vremya="2026-09-02T10:00:00+00:00", reactions=[("👍", 2)])
-        pozdnee = soobshchenie(self.OTKR, vremya="2026-09-05T10:00:00+00:00")
+    def test_odin_dizlayk_ne_otkrytie(self):
+        self.assertEqual(self.vidy(soobshchenie(self.OTKR, reactions=[("👍", 5), ("👎", 1)])), {})
+
+    def test_drugie_reaktsii_ne_meshayut(self):
+        st = soobshchenie(self.OTKR, vremya="2026-09-02T10:00:00+00:00", reactions=[("🔥", 3), ("👍", 2)])
+        self.assertEqual(self.vidy(st), {"Туризм": "2026-09-02T10:00:00+00:00"})
+
+    def test_pozdnee_s_dizlaykom_ne_perekryvaet(self):
+        rannee = soobshchenie(self.OTKR, vremya="2026-09-02T10:00:00+00:00")
+        pozdnee = soobshchenie(self.OTKR, vremya="2026-09-05T10:00:00+00:00", reactions=[("👎", 2)])
         self.assertEqual(self.vidy(rannee, pozdnee), {"Туризм": "2026-09-02T10:00:00+00:00"})
 
 
@@ -137,12 +145,12 @@ class NewLabel(unittest.TestCase):
     SNAPSHOT_26 = (ZDES / "lenta-2026-10-26.html").read_text(encoding="utf-8")
 
     def test_snapshot_26_october(self):
-        # Первая страница ленты 26.10.2026 ~10:40 UTC: №42 (09:02, 👍 2) и №40 (23.10, 👍 1).
+        # Первая страница ленты 26.10.2026 ~10:40 UTC, правило 👎 (11.11.2026): №42 (26.10 09:02, 👎 3)
+        # и №40 (23.10, 👎 5) не в счёт; Шенген — 25.10 23:01 без 👎.
         types = lo.po_vidam(self.SNAPSHOT_26)
         self.assertEqual(types["Шенген: бизнес / транзит / спорт / туризм для членов семьи граждан ЕС"],
-                         "2026-10-26T09:02:13+00:00")
-        self.assertEqual(types["Работа по найму / Воссоединение семьи / Другие национальные визы"],
-                         "2026-10-23T14:49:47+00:00")
+                         "2026-10-25T23:01:46+00:00")
+        self.assertNotIn("Работа по найму / Воссоединение семьи / Другие национальные визы", types)
 
     def test_snapshots_have_no_unknown_news(self):
         # Обе ленты: новости бота со старой и с новой меткой; комментарии, опрос, ответ с цитатой.
@@ -174,8 +182,8 @@ class NewLabel(unittest.TestCase):
         self.assertEqual(lo.po_vidam(f"<html>{html}</html>"), {"Виза D-TYPE": "2026-10-26T09:00:00+00:00"})
 
     def run_main(self, previous):
-        known = ("2026-10-26T09:02:13+00:00", "🟢 Туризм — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", 1, 2)
-        foreign = ("2026-10-26T10:00:00+00:00", "🟢 Учёба — ПОЯВИЛИСЬ СЛОТЫ", 1, 3)
+        known = ("2026-10-26T09:02:13+00:00", "🟢 Туризм — СТАЛА ДОСТУПНА ФОРМА ЗАПИСИ", 1, 2, 0)
+        foreign = ("2026-10-26T10:00:00+00:00", "🟢 Учёба — ПОЯВИЛИСЬ СЛОТЫ", 1, 3, 0)
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "last.json"
             if previous is not None:
@@ -222,7 +230,7 @@ class Listanie(unittest.TestCase):
         self.assertEqual(sorted(m[3] for m in vse), [1, 2, 7, 8])
 
     def test_bez_reaktsiy_v_kanale_none(self):
-        # Разметка реакций сменилась — правило 👍 стёрло бы таблицу; не пишем.
+        # Разметка реакций сменилась — правило 👎 сочло бы открытием всё подряд; не пишем.
         bez = '<html><div class="tgme_channel_history">' + soobshchenie("n1", post=1) + "</div></html>"
         self.assertIsNone(lo.whole_channel(lambda before: bez))
 

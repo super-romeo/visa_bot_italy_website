@@ -6,14 +6,15 @@
 одной новости. Новость 🟢 без знакомой метки — тревога: таблица пишется по знакомым, а прогон
 краснеет.
 
-Открытием считается только сообщение, у которого есть хотя бы одна реакция 👍
-(слово Владельца 11.10.2026: «считать появлением слотов только если у
-соответствующего сообщения в канале хоть кто-то отреагировал палец вверх»).
+Открытием считается сообщение, у которого нет ни одной реакции 👎 (слово Владельца
+11.11.2026: «давай считать выкладкой не если кто-то поставил лайк, а если никто не поставил
+дизлайк»). Этим заменено правило 11.10.2026 «только если … хоть кто-то отреагировал палец
+вверх».
 
 Лента t.me/s/<канал> отдаёт последние сообщения страницей; скрипт листает её
 назад (?before=<номер>) до начала канала и каждый раз считает таблицу заново.
 Прежний last.json больше не источник: 👍 ставят и снимают после публикации, и
-старое открытие без 👍 осталось бы в таблице навсегда. Не дочитали ленту до
+старое открытие с 👎 осталось бы в таблице навсегда. Не дочитали ленту до
 конца (сеть, разметка) — файл не трогаем.
 
 Разбор ленты — html.parser стандартной библиотеки (01.10.2026). Было —
@@ -38,6 +39,7 @@ NEWS_MARK = "🟢"  # у бота этим значком начинается �
 OPENING = re.compile(NEWS_MARK + r"\s*(.*?)\s*[—-]\s*(?:" + "|".join(map(re.escape, LABELS))
                      + r")(?![А-ЯЁA-Zа-яёa-z]|\s+[А-ЯЁA-Z]{2})")
 THUMBS_UP = "👍"
+THUMBS_DOWN = "👎"
 FAIL = Path(__file__).resolve().parents[2] / "last.json"
 # Страниц ленты не больше этого: канал — десятки сообщений, страница — около двадцати.
 # Упёрлись — значит лента не кончилась, и неполная таблица хуже прежней: не пишем.
@@ -60,7 +62,7 @@ class _Lenta(HTMLParser):
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.soobshcheniya = []   # [время, текст, 👍, номер сообщения]
+        self.soobshcheniya = []   # [время, текст, 👍, номер сообщения, 👎]
         self._glubina_teksta = 0  # вложенность div внутри текста; 0 — вне текста
         self._v_date = False      # внутри a.tgme_widget_message_date
         self._reaction = None     # [эмодзи, остальное] внутри span.tgme_reaction
@@ -70,7 +72,7 @@ class _Lenta(HTMLParser):
     def handle_starttag(self, teg, attrs):
         klassy = set((dict(attrs).get("class") or "").split())
         if teg == "div" and "tgme_widget_message_wrap" in klassy:
-            self.soobshcheniya.append(["", "", 0, 0])
+            self.soobshcheniya.append(["", "", 0, 0, 0])
             self._glubina_teksta, self._v_date, self._reaction = 0, False, None
         elif not self.soobshcheniya:
             return
@@ -111,6 +113,8 @@ class _Lenta(HTMLParser):
             chislo = re.search(r"\d+", ostalnoe)
             if emodzi.strip() == THUMBS_UP and chislo:
                 self.soobshcheniya[-1][2] += int(chislo.group())
+            elif emodzi.strip() == THUMBS_DOWN and chislo:
+                self.soobshcheniya[-1][4] += int(chislo.group())
             self._reaction, self._in_emoji = None, False
 
     def handle_data(self, dannye):
@@ -128,34 +132,34 @@ def _parse(stranica: str) -> _Lenta:
 
 
 def _clean(entries):
-    for vremya, tekst, thumbs, post in entries:
+    for vremya, tekst, thumbs, post, dislikes in entries:
         tekst = re.sub(r"\s+", " ", tekst).strip()
         if vremya and tekst:
-            yield vremya, tekst, thumbs, post
+            yield vremya, tekst, thumbs, post, dislikes
 
 
 def messages(stranica: str):
-    """Сообщения ленты с текстом: (время, текст, число 👍, номер сообщения)."""
+    """Сообщения ленты с текстом: (время, текст, число 👍, номер сообщения, число 👎)."""
     yield from _clean(_parse(stranica).soobshcheniya)
 
 
 def soobshcheniya(stranica: str):
     """Пары (время, текст) — контракт снимка ленты 01.10.2026."""
-    for vremya, tekst, _, _ in messages(stranica):
+    for vremya, tekst, *_ in messages(stranica):
         yield vremya, tekst
 
 
 def po_vidam(soobshch) -> dict:
-    """Тип визы → время последнего открытия записи, у которого есть 👍.
+    """Тип визы → время последнего открытия записи, у которого нет ни одного 👎.
 
     `soobshch` — страница ленты (str) либо уже разобранные сообщения.
     """
     if isinstance(soobshch, str):
         soobshch = messages(soobshch)
     itog = {}
-    for t, s, thumbs, _ in soobshch:
+    for t, s, _, _, dislikes in soobshch:
         vid = OPENING.search(s)
-        if vid and thumbs >= 1 and t > itog.get(vid.group(1), ""):
+        if vid and dislikes == 0 and t > itog.get(vid.group(1), ""):
             itog[vid.group(1)] = t
     return itog
 
@@ -167,7 +171,7 @@ def unknown_news(soobshch) -> list:
     значку, а не по виду метки: метку могут написать и строчными, и с предлогом. Граница: чужое
     сообщение с 🟢 тоже краснит прогон — каждый час, пока его не уберут или не допишут LABELS.
     """
-    return sorted({p for _, s, _, p in soobshch if NEWS_MARK in s and not OPENING.search(s)})
+    return sorted({p for _, s, _, p, _ in soobshch if NEWS_MARK in s and not OPENING.search(s)})
 
 
 def fetch_page(before=None) -> str:
@@ -185,7 +189,7 @@ def whole_channel(fetch=fetch_page):
     «Не дочитали» — всё, что не похоже на настоящую ленту: страница без блока ленты
     (заглушка, ограничение частоты), пустая первая страница, страница «до N» с номером ≥ N
     (листание не понято), ни одной реакции во всём канале (разметка реакций сменилась —
-    иначе правило 👍 молча стёрло бы таблицу), упор в MAX_PAGES. Пустая страница «до N» —
+    иначе правило 👎 молча сочло бы открытием всё подряд), упор в MAX_PAGES. Пустая страница «до N» —
     настоящий конец ленты. Номера берутся у всех сообщений, и без текста тоже (опрос, фото):
     иначе страница из таких сообщений выглядела бы концом.
     """
